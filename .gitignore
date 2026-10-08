@@ -1,0 +1,5 @@
+.env
+*.db
+/bamboocians
+/app
+.DS_Store
