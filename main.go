@@ -6,6 +6,7 @@ import (
 	"bamboocians/middleware"
 	"bamboocians/routes"
 	"log"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -30,8 +31,21 @@ func main() {
 
 	app.Use(recover.New())
 	app.Use(logger.New())
+	allowedOrigins := map[string]bool{}
+	for _, o := range strings.Split(cfg.CORSOrigins, ",") {
+		if o = strings.TrimRight(strings.TrimSpace(o), "/"); o != "" {
+			allowedOrigins[o] = true
+		}
+	}
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: cfg.CORSOrigins,
+		// Log rejected origins so a CORS_ORIGINS mismatch is visible in the server logs
+		AllowOriginsFunc: func(origin string) bool {
+			if allowedOrigins[origin] {
+				return true
+			}
+			log.Printf("CORS blocked origin %q: add it to CORS_ORIGINS (currently %q)", origin, cfg.CORSOrigins)
+			return false
+		},
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
 	}))
