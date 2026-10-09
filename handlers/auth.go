@@ -5,6 +5,7 @@ import (
 	"bamboocians/middleware"
 	"bamboocians/models"
 	"bamboocians/utils"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -28,8 +29,15 @@ func Register(c *fiber.Ctx) error {
 		return utils.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
 
+	input.Name = strings.TrimSpace(input.Name)
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+
 	if input.Name == "" || input.Email == "" || input.Password == "" {
 		return utils.Fail(c, fiber.StatusBadRequest, "name, email and password are required")
+	}
+
+	if len(input.Password) < 6 {
+		return utils.Fail(c, fiber.StatusBadRequest, "password must be at least 6 characters")
 	}
 
 	validRoles := map[string]bool{
@@ -53,8 +61,14 @@ func Register(c *fiber.Ctx) error {
 		Role:     input.Role,
 	}
 
-	if err := database.DB.Create(&user).Error; err != nil {
+	var existing int64
+	database.DB.Model(&models.User{}).Where("email = ?", user.Email).Count(&existing)
+	if existing > 0 {
 		return utils.Fail(c, fiber.StatusConflict, "email already registered")
+	}
+
+	if err := database.DB.Create(&user).Error; err != nil {
+		return utils.Fail(c, fiber.StatusInternalServerError, "failed to create account")
 	}
 
 	// Create an empty profile for the chosen role
@@ -76,6 +90,8 @@ func Login(c *fiber.Ctx) error {
 	if err := c.BodyParser(&input); err != nil {
 		return utils.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
+
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
 
 	var user models.User
 	if err := database.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {

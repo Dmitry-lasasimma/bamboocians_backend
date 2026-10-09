@@ -61,11 +61,14 @@ func UpdateTalentProfile(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 	var profile models.TalentProfile
 	database.DB.Where("user_id = ?", userID).First(&profile)
+	profileID := profile.ID
 
 	if err := c.BodyParser(&profile); err != nil {
 		return utils.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
+	profile.ID = profileID
 	profile.UserID = userID
+	profile.User = models.User{}
 	database.DB.Save(&profile)
 	return utils.OK(c, profile)
 }

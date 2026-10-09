@@ -4,6 +4,7 @@ import (
 	"bamboocians/database"
 	"bamboocians/models"
 	"bamboocians/utils"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -61,11 +62,14 @@ func UpdateVenueProfile(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 	var profile models.VenueProfile
 	database.DB.Where("user_id = ?", userID).First(&profile)
+	profileID := profile.ID
 
 	if err := c.BodyParser(&profile); err != nil {
 		return utils.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
+	profile.ID = profileID
 	profile.UserID = userID
+	profile.User = models.User{}
 	database.DB.Save(&profile)
 	return utils.OK(c, profile)
 }
@@ -116,19 +120,19 @@ func GetVenueCalendar(c *fiber.Ctx) error {
 		Order("date asc").Find(&bookings)
 
 	type CalendarEntry struct {
-		BookingID uint   `json:"booking_id"`
+		BookingID  uint   `json:"booking_id"`
 		EventTitle string `json:"event_title"`
-		Date      string `json:"date"`
-		Location  string `json:"location"`
-		Status    string `json:"status"`
+		Date       string `json:"date"`
+		Location   string `json:"location"`
+		Status     string `json:"status"`
 	}
 
-	var entries []CalendarEntry
+	entries := []CalendarEntry{}
 	for _, b := range bookings {
 		entries = append(entries, CalendarEntry{
 			BookingID:  b.ID,
 			EventTitle: b.Event.Title,
-			Date:       b.Date.Format("2006-01-02"),
+			Date:       b.Date.Format(time.RFC3339),
 			Location:   b.Event.Location,
 			Status:     b.Status,
 		})

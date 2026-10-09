@@ -23,6 +23,15 @@ func SendMessage(c *fiber.Ctx) error {
 		return utils.Fail(c, fiber.StatusBadRequest, "content cannot be empty")
 	}
 
+	if input.ReceiverID == senderID {
+		return utils.Fail(c, fiber.StatusBadRequest, "cannot send a message to yourself")
+	}
+
+	var receiver models.User
+	if err := database.DB.First(&receiver, input.ReceiverID).Error; err != nil {
+		return utils.Fail(c, fiber.StatusNotFound, "recipient not found")
+	}
+
 	msg := models.Message{
 		SenderID:   senderID,
 		ReceiverID: input.ReceiverID,
@@ -33,11 +42,12 @@ func SendMessage(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"success": true, "data": msg})
 }
 
+// GetInbox returns sent and received messages so the client can build every thread
 func GetInbox(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 	var messages []models.Message
 	database.DB.Preload("Sender").Preload("Receiver").
-		Where("receiver_id = ?", userID).
+		Where("receiver_id = ? OR sender_id = ?", userID, userID).
 		Order("created_at desc").Find(&messages)
 	return utils.OK(c, messages)
 }

@@ -12,6 +12,8 @@ type Config struct {
 	DBPath    string
 	// Comma-separated list of allowed CORS origins
 	CORSOrigins string
+	// Insert demo accounts and sample data on startup
+	SeedDemo bool
 }
 
 func Load() *Config {
@@ -19,9 +21,10 @@ func Load() *Config {
 
 	return &Config{
 		JWTSecret:   getEnv("JWT_SECRET", "bamboocians-secret"),
-		Port:        getEnv("PORT", "8080"),
+		Port:        getEnv("PORT", "8081"),
 		DBPath:      getEnv("DB_PATH", "./bamboocians.db"),
 		CORSOrigins: getEnv("CORS_ORIGINS", "http://localhost:3000"),
+		SeedDemo:    getEnv("SEED_DEMO", "false") == "true",
 	}
 }
 

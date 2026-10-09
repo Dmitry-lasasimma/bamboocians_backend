@@ -41,6 +41,12 @@ func CreateBooking(c *fiber.Ctx) error {
 		return utils.Fail(c, fiber.StatusBadRequest, "date must be RFC3339 format")
 	}
 
+	// The booked user must exist and have the role matching the booking type
+	var bookedTo models.User
+	if err := database.DB.Where("id = ? AND role = ?", input.BookedToID, input.BookingType).First(&bookedTo).Error; err != nil {
+		return utils.Fail(c, fiber.StatusNotFound, input.BookingType+" not found")
+	}
+
 	booking := models.Booking{
 		EventID:     input.EventID,
 		BookedByID:  userID,

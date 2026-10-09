@@ -25,6 +25,16 @@ func CreateContract(c *fiber.Ctx) error {
 		return utils.Fail(c, fiber.StatusNotFound, "booking not found")
 	}
 
+	if booking.Status != models.BookingStatusConfirmed {
+		return utils.Fail(c, fiber.StatusBadRequest, "contracts can only be created for confirmed bookings")
+	}
+
+	var existing int64
+	database.DB.Model(&models.Contract{}).Where("booking_id = ?", booking.ID).Count(&existing)
+	if existing > 0 {
+		return utils.Fail(c, fiber.StatusConflict, "a contract already exists for this booking")
+	}
+
 	contract := models.Contract{
 		BookingID:       input.BookingID,
 		Content:         input.Content,

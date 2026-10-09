@@ -20,6 +20,9 @@ func main() {
 	middleware.JWTSecret = cfg.JWTSecret
 
 	database.Connect(cfg.DBPath)
+	if cfg.SeedDemo {
+		database.SeedDemo()
+	}
 
 	app := fiber.New(fiber.Config{
 		AppName: "Bamboocians API v1.0",

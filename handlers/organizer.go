@@ -22,11 +22,14 @@ func UpdateOrganizerProfile(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
 	var profile models.OrganizerProfile
 	database.DB.Where("user_id = ?", userID).First(&profile)
+	profileID := profile.ID
 
 	if err := c.BodyParser(&profile); err != nil {
 		return utils.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
+	profile.ID = profileID
 	profile.UserID = userID
+	profile.User = models.User{}
 	database.DB.Save(&profile)
 	return utils.OK(c, profile)
 }
@@ -45,10 +48,10 @@ func OrganizerDashboard(c *fiber.Ctx) error {
 	database.DB.Where("organizer_id = ?", userID).Order("created_at desc").Limit(5).Find(&recentEvents)
 
 	return utils.OK(c, fiber.Map{
-		"total_events":    totalEvents,
-		"upcoming_events": upcomingEvents,
+		"total_events":     totalEvents,
+		"upcoming_events":  upcomingEvents,
 		"pending_bookings": pendingBookings,
-		"recent_events":   recentEvents,
+		"recent_events":    recentEvents,
 	})
 }
 
@@ -199,6 +202,7 @@ func AddGuest(c *fiber.Ctx) error {
 }
 
 func UpdateGuestStatus(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
 	id := c.Params("id")
 	var input struct {
 		Status string `json:"status"`
@@ -206,14 +210,35 @@ func UpdateGuestStatus(c *fiber.Ctx) error {
 	if err := c.BodyParser(&input); err != nil {
 		return utils.Fail(c, fiber.StatusBadRequest, "invalid request body")
 	}
-	database.DB.Model(&models.Guest{}).Where("id = ?", id).Update("status", input.Status)
+
+	switch input.Status {
+	case models.GuestStatusInvited, models.GuestStatusConfirmed, models.GuestStatusDeclined:
+	default:
+		return utils.Fail(c, fiber.StatusBadRequest, "status must be invited, confirmed or declined")
+	}
+
+	// Only the organizer who owns the guest's event may update it
+	var guest models.Guest
+	if err := database.DB.Joins("JOIN events ON events.id = guests.event_id").
+		Where("guests.id = ? AND events.organizer_id = ?", id, userID).
+		First(&guest).Error; err != nil {
+		return utils.Fail(c, fiber.StatusNotFound, "guest not found")
+	}
+	database.DB.Model(&guest).Update("status", input.Status)
 	return utils.OK(c, fiber.Map{"message": "guest status updated"})
 }
 
 // ── Tickets ───────────────────────────────────────────────────────────────────
 
 func GetTickets(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(uint)
 	eventID := c.Params("eventId")
+
+	var event models.Event
+	if err := database.DB.Where("id = ? AND organizer_id = ?", eventID, userID).First(&event).Error; err != nil {
+		return utils.Fail(c, fiber.StatusNotFound, "event not found")
+	}
+
 	var tickets []models.Ticket
 	database.DB.Where("event_id = ?", eventID).Find(&tickets)
 	return utils.OK(c, tickets)
